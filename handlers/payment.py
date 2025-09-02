@@ -137,7 +137,7 @@ async def process_payment_receipt(message: types.Message, state: FSMContext):
             f"📱 <b>Телефон:</b> {user.phone}\n"
             f"📍 <b>Адрес:</b> {user.address}\n"
             f"💰 <b>Сумма заказа:</b> {data['total']} СОМ\n"
-            f"💸 <b>Предоплата (50%):</b> {data['prepayment']} СОМ\n\n"
+            f"💸 <b>Предоплата (20%):</b> {data['prepayment']} СОМ\n\n"
             f"📦 <b>Товары:</b>\n{order_items_text}\n"
             f"🧾 <b>Чек об оплате приложен выше</b>\n\n"
             f"Для связи с клиентом:\n"

@@ -11,7 +11,61 @@ from states import ViewProduct
 router = Router()
 logger = logging.getLogger(__name__)
 
+# ...existing code...
 
+@router.message(lambda message: message.text and not message.text.startswith("/") and message.text not in ["⚙️ Настройки", "📁 Категории", "📊 Статистика", "📋 Заказы", "🔙 Главное меню", "🛒 Посмотреть корзину", "🗑 Очистить корзину", "✅ Завершить заказ", "🔙 Назад к покупкам"])
+async def show_category_products(message: types.Message, state: FSMContext):
+    """Handle category selection and show products"""
+    
+    logger.info(f"Category handler triggered for: {message.text}")
+    
+    db = next(get_db())
+    
+    try:
+        # Check if this text matches any category
+        category = None
+        
+        # Try exact match with emoji + name
+        category = db.query(Category).filter(
+            (Category.emoji + " " + Category.name) == message.text
+        ).first()
+        
+        if not category:
+            # Don't respond if it's not a category
+            logger.info(f"No category found for: {message.text}")
+            db.close()
+            return
+        
+        logger.info(f"Found category: {category.name} (id: {category.id})")
+        
+        products = db.query(Product).filter(
+            Product.category_id == category.id, 
+            Product.active == True
+        ).all()
+        
+        logger.info(f"Found {len(products)} products in category {category.name}")
+        
+        if not products:
+            await message.answer("📭 В этой категории пока нет товаров.")
+            db.close()
+            return
+        
+        await state.update_data(
+            category_id=category.id, 
+            product_index=0, 
+            products=[p.id for p in products]
+        )
+        
+        await show_product(message, state, products[0], 0, len(products))
+        await state.set_state(ViewProduct.viewing)
+        
+    except Exception as e:
+        logger.error(f"Error in category handler: {e}", exc_info=True)
+        await message.answer("❌ Произошла ошибка при загрузке товаров.")
+    finally:
+        db.close()
+
+# ...existing code...
 
 
 async def show_product(message: types.Message, state: FSMContext, product: Product, index: int, total: int):
