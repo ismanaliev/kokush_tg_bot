@@ -11,63 +11,8 @@ from states import ViewProduct
 router = Router()
 logger = logging.getLogger(__name__)
 
-# List all category names exactly as they appear in the keyboard
-CATEGORY_NAMES = [
-    "✍️ Ручки",
-    "📒 Тетради", 
-    "📚 Книги",
-    "🎨 Предметы для ИЗО",
-    "✏️ Карандаши",
-    "📗 Обложки",
-    "🖍 Маркеры и фломастеры",
-    "📝 Прописи"
-]
 
-@router.message(F.text.in_(CATEGORY_NAMES))
-async def show_category_products(message: types.Message, state: FSMContext):
-    """Handle category selection and show products"""
-    logger.info(f"Category handler triggered for: {message.text}")
-    
-    db = next(get_db())
-    
-    try:
-        # Extract category name (remove emoji and space)
-        parts = message.text.split(" ", 1)
-        category_name = parts[1] if len(parts) > 1 else message.text
-        
-        logger.info(f"Looking for category: {category_name}")
-        
-        category = db.query(Category).filter(Category.name == category_name).first()
-        if not category:
-            await message.answer(f"❌ Категория '{category_name}' не найдена.")
-            db.close()
-            return
-        
-        products = db.query(Product).filter(
-            Product.category_id == category.id, 
-            Product.active == True
-        ).all()
-        
-        logger.info(f"Found {len(products)} products in category {category.name}")
-        
-        if not products:
-            await message.answer("📭 В этой категории пока нет товаров.")
-            db.close()
-            return
-        
-        await state.update_data(
-            category_id=category.id, 
-            product_index=0, 
-            products=[p.id for p in products]
-        )
-        
-        await show_product(message, state, products[0], 0, len(products))
-        
-    except Exception as e:
-        logger.error(f"Error in category handler: {e}", exc_info=True)
-        await message.answer("❌ Произошла ошибка при загрузке товаров.")
-    finally:
-        db.close()
+
 
 async def show_product(message: types.Message, state: FSMContext, product: Product, index: int, total: int):
     """Display a single product with navigation"""
@@ -99,6 +44,12 @@ async def show_product(message: types.Message, state: FSMContext, product: Produ
 async def callback_prev_product(callback: types.CallbackQuery, state: FSMContext):
     """Navigate to previous product"""
     data = await state.get_data()
+    products = data.get('products', [])
+    # If category has only one product — notify and do nothing
+    if len(products) <= 1:
+        await callback.answer("❗ В этой категории только 1 товар", show_alert=False)
+        return
+
     current_index = int(callback.data.split("_")[1])
     
     if current_index > 0:
@@ -119,6 +70,12 @@ async def callback_prev_product(callback: types.CallbackQuery, state: FSMContext
 async def callback_next_product(callback: types.CallbackQuery, state: FSMContext):
     """Navigate to next product"""
     data = await state.get_data()
+    products = data.get('products', [])
+    # If category has only one product — notify and do nothing
+    if len(products) <= 1:
+        await callback.answer("❗ В этой категории только 1 товар", show_alert=False)
+        return
+
     current_index = int(callback.data.split("_")[1])
     
     if current_index < len(data['products']) - 1:
@@ -158,6 +115,58 @@ async def show_product_edit(message: types.Message, state: FSMContext, product: 
     else:
         await message.edit_text(caption, reply_markup=keyboard, parse_mode="HTML")
 
+@router.callback_query(ViewProduct.viewing, F.data.startswith("next_"))
+async def callback_next_product(callback: types.CallbackQuery, state: FSMContext):
+    """Navigate to next product"""
+    data = await state.get_data()
+    products = data.get('products', [])
+    # If category has only one product — notify and do nothing
+    if len(products) <= 1:
+        await callback.answer("❗ В этой категории только 1 товар", show_alert=False)
+        return
+
+    current_index = int(callback.data.split("_")[1])
+    
+    if current_index < len(products) - 1:
+        new_index = current_index + 1
+    else:
+        new_index = 0
+    
+    await state.update_data(product_index=new_index)
+    
+    db = next(get_db())
+    product = db.query(Product).filter(Product.id == products[new_index]).first()
+    db.close()
+    
+    await show_product_edit(callback.message, state, product, new_index, len(products))
+    await callback.answer()
+
+@router.callback_query(ViewProduct.viewing, F.data.startswith("prev_"))
+async def callback_prev_product(callback: types.CallbackQuery, state: FSMContext):
+    """Navigate to previous product"""
+    data = await state.get_data()
+    products = data.get('products', [])
+    # If category has only one product — notify and do nothing
+    if len(products) <= 1:
+        await callback.answer("❗ В этой категории только 1 товар", show_alert=False)
+        return
+
+    current_index = int(callback.data.split("_")[1])
+    
+    if current_index > 0:
+        new_index = current_index - 1
+    else:
+        new_index = len(products) - 1
+    
+    await state.update_data(product_index=new_index)
+    
+    db = next(get_db())
+    product = db.query(Product).filter(Product.id == products[new_index]).first()
+    db.close()
+    
+    await show_product_edit(callback.message, state, product, new_index, len(products))
+    await callback.answer()
+    
 @router.callback_query(ViewProduct.viewing, F.data.startswith("add_"))
 async def callback_add_to_cart(callback: types.CallbackQuery, state: FSMContext):
     """Add product to cart"""

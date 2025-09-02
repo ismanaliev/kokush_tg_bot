@@ -1,7 +1,7 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import func  # Add this import
+from sqlalchemy import func
 from models import Category, Product, Order, User
 from database import get_db
 from config import ADMIN_CHAT_ID
@@ -25,7 +25,7 @@ async def admin_panel(message: types.Message):
     
     await message.answer(admin_text, parse_mode="HTML", reply_markup=get_admin_keyboard())
 
-@router.message(F.text == "📦 Товары")
+@router.message(F.text == "⚙️ Настройки")
 async def manage_products(message: types.Message):
     if not is_admin(message):
         return
@@ -35,7 +35,9 @@ async def manage_products(message: types.Message):
         "<b>Команды:</b>\n"
         "/add_product - Добавить новый товар\n"
         "/list_products - Показать все товары\n"
-        "/delete_product ID - Удалить товар"
+        "/delete_product ID - Удалить товар\n"
+        "/delete_category ID - Удалить категорию\n"
+        "/add_category NAME - Добавить новую категорию\n"
     )
     
     await message.answer(text, parse_mode="HTML")
@@ -62,6 +64,7 @@ async def start_add_product(message: types.Message, state: FSMContext):
     await message.answer(text)
     await state.set_state(AdminProductAdd.waiting_for_category)
     db.close()
+
 
 @router.message(AdminProductAdd.waiting_for_category)
 async def add_product_category(message: types.Message, state: FSMContext):
@@ -173,7 +176,87 @@ async def back_to_main(message: types.Message):
         return
     
     await message.answer("Выберите категорию:", reply_markup=get_categories_keyboard())
-# Add these handlers for the missing admin functions
+
+@router.message(Command("add_category"))
+async def add_category(message: types.Message):
+    if not is_admin(message):
+        return
+
+    # Ожидается: /add_category 😊 Название
+    rest = message.text.partition(" ")[2].strip()
+    if not rest:
+        await message.answer("Использование: /add_category <emoji> <name>\nПример: /add_category 🧸 Игрушки")
+        return
+
+    try:
+        emoji, name = rest.split(maxsplit=1)
+    except ValueError:
+        await message.answer("Ошибка формата. Использование: /add_category <emoji> <name>")
+        return
+
+    db = next(get_db())
+    # Проверка на существующую категорию с таким именем (регистронезависимо)
+    if db.query(Category).filter(func.lower(Category.name) == name.lower()).first():
+        await message.answer("❌ Категория с таким именем уже существует.")
+        db.close()
+        return
+
+    new_cat = Category(name=name, emoji=emoji)
+    db.add(new_cat)
+    db.commit()
+    db.refresh(new_cat)
+    db.close()
+
+    await message.answer(f"✅ Категория добавлена: {new_cat.id}. {new_cat.emoji} {new_cat.name}")
+
+@router.message(Command("delete_category"))
+async def delete_category(message: types.Message):
+    if not is_admin(message):
+        return
+
+    # Ожидается: /delete_category 3
+    rest = message.text.partition(" ")[2].strip()
+    if not rest:
+        await message.answer("Использование: /delete_category <id>\nПример: /delete_category 3")
+        return
+
+    try:
+        cat_id = int(rest.split()[0])
+    except ValueError:
+        await message.answer("❌ Введите корректный ID (число).")
+        return
+
+    db = next(get_db())
+    category = db.query(Category).filter(Category.id == cat_id).first()
+    if not category:
+        await message.answer("❌ Категория не найдена.")
+        db.close()
+        return
+
+    product_count = db.query(Product).filter(Product.category_id == cat_id).count()
+
+    if product_count == 1:
+        # Если в категории только один товар — уведомляем и не удаляем
+        await message.answer(f"❗ Категория '{category.name}' содержит только 1 товар. Удаление не требуется.")
+        db.close()
+        return
+
+    if product_count > 1:
+        # Если больше одного товара — отказываем в удалении
+        await message.answer(
+            f"❌ Нельзя удалить категорию: в ней {product_count} товаров. Удалите товары или переместите их в другую категорию."
+        )
+        db.close()
+        return
+
+    # product_count == 0 → безопасно удалить
+    db.delete(category)
+    db.commit()
+    db.close()
+
+    await message.answer(f"✅ Категория {cat_id} удалена.")
+
+#Categories
 
 @router.message(F.text == "📁 Категории")
 async def manage_categories(message: types.Message):
@@ -190,6 +273,8 @@ async def manage_categories(message: types.Message):
     
     db.close()
     await message.answer(text, parse_mode="HTML")
+
+#Statistics
 
 @router.message(F.text == "📊 Статистика")
 async def show_statistics(message: types.Message):
@@ -217,6 +302,8 @@ async def show_statistics(message: types.Message):
     
     db.close()
     await message.answer(text, parse_mode="HTML")
+
+#Orders
 
 @router.message(F.text == "📋 Заказы")
 async def show_orders(message: types.Message):

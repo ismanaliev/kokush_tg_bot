@@ -27,10 +27,10 @@ Base.metadata.create_all(bind=engine)
 logger.info("Database tables created")
 
 # Include routers
-dp.include_router(user_router)
-dp.include_router(cart_router)
+dp.include_router(admin_router)  # Admin router first
 dp.include_router(payment_router)
-dp.include_router(admin_router)
+dp.include_router(user_router)
+dp.include_router(cart_router)   # Cart router after admin
 logger.info("Routers included")
 
 async def main():

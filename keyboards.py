@@ -8,6 +8,7 @@ def get_categories_keyboard():
     
     keyboard = [[KeyboardButton(text=f"{cat.emoji} {cat.name}")] for cat in categories]
     keyboard.append([KeyboardButton(text="🛒 Посмотреть корзину")])
+    keyboard.append([KeyboardButton(text="🗑 Очистить корзину")])
     db.close()
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
@@ -44,7 +45,7 @@ def get_cart_keyboard():
 
 def get_admin_keyboard():
     keyboard = [
-        [KeyboardButton(text="📁 Категории"), KeyboardButton(text="📦 Товары")],
+        [KeyboardButton(text="📁 Категории"), KeyboardButton(text="⚙️ Настройки")],
         [KeyboardButton(text="📊 Статистика"), KeyboardButton(text="📋 Заказы")],
         [KeyboardButton(text="🔙 Главное меню")]
     ]

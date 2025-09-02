@@ -33,7 +33,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 async def process_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
     await message.answer("📱 Введите ваш номер телефона:")
-    await state.set_state(Register.waiting_for_phone)
+    await state.set_state(Registration.waiting_for_phone)
 
 @router.message(Registration.waiting_for_phone)
 async def process_phone(message: types.Message, state: FSMContext):

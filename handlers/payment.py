@@ -35,7 +35,7 @@ async def start_checkout(message: types.Message, state: FSMContext):
     
     # Calculate totals
     total = sum(item.product.price * item.quantity for item in cart_items)
-    prepayment = total * 0.5
+    prepayment = total * 0.2
     
     # Show order summary
     text = "📋 <b>Ваш заказ:</b>\n\n"
@@ -139,7 +139,7 @@ async def process_payment_receipt(message: types.Message, state: FSMContext):
             f"💰 <b>Сумма заказа:</b> {data['total']} СОМ\n"
             f"💸 <b>Предоплата (50%):</b> {data['prepayment']} СОМ\n\n"
             f"📦 <b>Товары:</b>\n{order_items_text}\n"
-            f"🧾 <b>Чек об оплате приложен ниже</b>\n\n"
+            f"🧾 <b>Чек об оплате приложен выше</b>\n\n"
             f"Для связи с клиентом:\n"
             f"👤 tg://user?id={user.telegram_id}"
         )
