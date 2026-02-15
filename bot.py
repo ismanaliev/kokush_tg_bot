@@ -2,20 +2,22 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
-from config import API_TOKEN
-from database import Base, engine
-from handlers import user_router, admin_router, cart_router, payment_router
+from apscheduler.schedulers.asyncio import AsyncIOScheduler 
 
-# Set up more detailed logging
+from config import API_TOKEN, GROUP_CHAT_ID
+from database import Base, engine
+from handlers.common import common_router
+from handlers.admin import admin_router
+from handlers.pdf_handler import pdf_router
+from handlers.dispatcher import dispatch_router
+from services.notify_service import NotifyService
+
+# Logging setup
 logging.basicConfig(
     level=logging.INFO, 
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 )
 logger = logging.getLogger(__name__)
-
-# Log startup information
-logger.info("Starting bot...")
-logger.info(f"Using token: {API_TOKEN[:5]}...{API_TOKEN[-5:]}")
 
 # Initialize bot and dispatcher
 bot = Bot(token=API_TOKEN)
@@ -24,22 +26,33 @@ dp = Dispatcher(storage=storage)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
-logger.info("Database tables created")
 
 # Include routers
-dp.include_router(admin_router)  # Admin router first
-dp.include_router(payment_router)
-dp.include_router(user_router)
-dp.include_router(cart_router)   # Cart router after admin
-logger.info("Routers included")
+dp.include_router(admin_router)
+dp.include_router(common_router)
+dp.include_router(dispatch_router)
+dp.include_router(pdf_router)
 
 async def main():
+    # 1. Initialize the Notification Service
+    notifier = NotifyService(bot)
+
+    # 2. Setup and Start the Scheduler
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        notifier.run_check_cycle, 
+        "interval", 
+        minutes=1, 
+        args=[GROUP_CHAT_ID]
+    )
+    scheduler.start()
+    logger.info("Scheduler started: checking for alerts every 1 minute")
+
     logger.info("Starting polling...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     try:
-        logger.info("Bot is starting")
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Bot stopped")
