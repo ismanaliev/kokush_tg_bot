@@ -9,8 +9,7 @@ from database import SessionLocal
 from models import Load, Driver
 from handlers.states import LoadCreation
 from keyboards import get_driver_selection_keyboard, get_dispatcher_main_board
-from services.load_service import LoadService
-
+from n8n_client import push_to_n8n
 dispatch_router = Router()
 
 # --- Navigation ---
@@ -120,7 +119,6 @@ async def cmd_show_driver_selection(message: types.Message, load_id: int, driver
 
 @dispatch_router.callback_query(F.data.startswith("assign_"))
 async def handle_driver_assignment(callback: types.CallbackQuery):
-    # Data format: assign_{load_id}_{driver_id}
     parts = callback.data.split("_")
     load_id, driver_id = int(parts[1]), int(parts[2])
     
@@ -128,13 +126,18 @@ async def handle_driver_assignment(callback: types.CallbackQuery):
     load_service = LoadService(db)
     
     try:
-        # Pass the Telegram ID here; the service will handle the translation
+        # 1. Update Database
         load = load_service.assign_driver(
             load_id=load_id, 
             driver_id=driver_id, 
             dispatcher_tg_id=callback.from_user.id
         )
         
+        # 2. Trigger n8n (Stage 3)
+        # We fetch the driver object to get the name/tg_id for n8n
+        driver = load.driver 
+        await push_to_n8n(load, driver, action="load_assigned")
+
         await callback.message.edit_text(
             f"✅ Load <b>{load.external_load_id}</b> assigned successfully.",
             parse_mode="HTML"
@@ -144,7 +147,6 @@ async def handle_driver_assignment(callback: types.CallbackQuery):
     finally:
         db.close()
     await callback.answer()
-
 @dispatch_router.callback_query(F.data.startswith("confirm_"))
 async def handle_verification(callback: types.CallbackQuery):
     _, load_id = callback.data.split("_")
