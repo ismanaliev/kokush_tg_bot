@@ -488,6 +488,10 @@ async def get_support_history(
         for log in history
     ]
 
+@app.get("/aa")
+async def root():
+    return {"status": "online", "message": "KG Hostel API is running"}
+
 # Helper functions
 def load_knowledge_base():
     """Load knowledge base from file"""
