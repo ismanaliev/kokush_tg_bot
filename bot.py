@@ -8,8 +8,8 @@ from config import API_TOKEN, GROUP_CHAT_ID
 from database import Base, engine
 from handlers.common import common_router
 from handlers.admin import admin_router
-from handlers.pdf_handler import pdf_router
 from handlers.dispatcher import dispatch_router
+from handlers.tma import tma_router
 from services.notify_service import NotifyService
 
 # Logging setup
@@ -28,10 +28,10 @@ dp = Dispatcher(storage=storage)
 Base.metadata.create_all(bind=engine)
 
 # Include routers
+dp.include_router(tma_router)
 dp.include_router(admin_router)
 dp.include_router(common_router)
 dp.include_router(dispatch_router)
-dp.include_router(pdf_router)
 
 async def main():
     # 1. Initialize the Notification Service
@@ -48,7 +48,7 @@ async def main():
     scheduler.start()
     logger.info("Scheduler started: checking for alerts every 1 minute")
 
-    logger.info("Starting polling...")
+    logger.info("Starting polling...✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from models import Driver 
+from datetime import datetime, timedelta
+
 
 # --- Admin Keyboards ---
 def get_cancel_keyboard() -> ReplyKeyboardMarkup:
@@ -22,8 +24,7 @@ def get_staff_management_board(role: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="➕ Add", callback_data=f"add_{role}")
     builder.button(text="🗑️ Delete", callback_data=f"del_{role}")
-    builder.button(text="📋 List All", callback_data=f"list_{role}")
-    builder.adjust(2, 1, 1)
+    builder.adjust(2, 1)
     return builder.as_markup()
 
 def get_delete_staff_keyboard(staff_list: list, role: str) -> InlineKeyboardMarkup:
@@ -47,16 +48,45 @@ def get_delete_staff_keyboard(staff_list: list, role: str) -> InlineKeyboardMark
 def get_loads_management_board() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="📝 Active Loads", callback_data="list_loads")
-    builder.button(text="🧹 Clear History", callback_data="clear_loads")
     builder.adjust(1)
     return builder.as_markup()
 
 # --- Dispatcher Keyboards ---
+def get_date_roller_keyboard(start_offset: int = 0):
+    builder = InlineKeyboardBuilder()
+    now = datetime.utcnow()
+    
+    # Add date buttons
+    for i in range(start_offset, start_offset + 6):
+        date_obj = now + timedelta(days=i)
+        builder.add(InlineKeyboardButton(
+            text=date_obj.strftime("%b %d"), 
+            callback_data=f"roller_{date_obj.strftime('%Y-%m-%d')}"
+        ))
+    
+    # Configure the layout: 3 buttons per row
+    builder.adjust(3)
+    
+    # Add navigation buttons as a new row
+    builder.row(
+        InlineKeyboardButton(text="⬅️ Earlier", callback_data=f"shift_{max(0, start_offset - 6)}"),
+        InlineKeyboardButton(text="Later ➡️", callback_data=f"shift_{start_offset + 6}")
+    )
+    
+    return builder.as_markup()
+
+def get_timezone_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="EST (UTC-5)", callback_data="set_tz_EST"),
+        InlineKeyboardButton(text="PST (UTC-8)", callback_data="set_tz_PST")
+    )
+    return builder.as_markup()
 
 def get_dispatcher_main_board() -> ReplyKeyboardMarkup: 
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="➕ Add New Load (PDF)")],
+            [KeyboardButton(text="➕ Add New Load")],
             [KeyboardButton(text="📦 Active Loads")]
         ],
         resize_keyboard=True
